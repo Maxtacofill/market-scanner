@@ -23,7 +23,7 @@ DROP_THRESHOLD = -0.03             # BUY hvis retur <= terskel (f.eks. -3%)
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 # Alternativ (mindre sikkert): lim inn direkte
 if not DISCORD_WEBHOOK_URL:
-    DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1409135404225134735/WYnpLO0SK1_vjgHdArBeejkXVhwCfs4v6VpfhWwAi-HeVQW47D66y4OTANZRBCeWuIPX"  # <-- valgfritt: lim inn Discord-webhooken din her som streng
+    DISCORD_WEBHOOK_URL = "PASTE_HERE"  # <-- valgfritt: lim inn Discord-webhooken din her som streng
 
 WEBHOOK_TIMEOUT = 12  # sekunder
 
