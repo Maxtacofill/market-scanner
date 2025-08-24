@@ -15,13 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Valgfritt: sett runner-lokaltid (påvirker bare 'date', ikke cron)
       - name: Set runner timezone to Europe/Oslo
         run: |
           sudo timedatectl set-timezone Europe/Oslo || true
           date
 
-      # Sjekk lokal Oslo-tid og avgjør om vi skal kjøre
       - name: Decide whether to run now
         id: gate
         shell: bash
@@ -49,7 +47,7 @@ jobs:
       - name: Run scanner
         if: steps.gate.outputs.should_run == 'true'
         run: |
-          python your_script.py
+          python "best backtester.py"
 
       - name: Skip note
         if: steps.gate.outputs.should_run != 'true'
