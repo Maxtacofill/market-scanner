@@ -2,7 +2,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 import os
-import io
 import json
 import numpy as np
 import pandas as pd
@@ -16,16 +15,13 @@ START_DATE = "2024-01-01"          # Hent historikk nok til 3-dagers retur
 END_DATE: Optional[str] = None     # None = i dag
 LOOKBACK_DAYS = 3                  # Fast 3-dagers retur
 DROP_THRESHOLD = -0.03             # BUY hvis retur <= terskel (f.eks. -3%)
+WEBHOOK_TIMEOUT = 12               # sekunder
 # ====================
 
-# >>> SETT WEBHOOK HER <<<
-# Beste praksis: miljøvariabel
+# >>> WEBHOOK FRA SECRET (ingen fallback) <<<
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
-# Alternativ (mindre sikkert): lim inn direkte
 if not DISCORD_WEBHOOK_URL:
-    DISCORD_WEBHOOK_URL = "PASTE_HERE"  # <-- valgfritt: lim inn Discord-webhooken din her som streng
-
-WEBHOOK_TIMEOUT = 12  # sekunder
+    raise SystemExit("Mangler DISCORD_WEBHOOK_URL (GitHub secret). Avbryter.")
 
 TICKERS = [
     "PROT.OL",   # Protector
@@ -110,9 +106,7 @@ def _build_table_preview(df: pd.DataFrame, max_rows: int = 15) -> str:
     if df.empty:
         return "Ingen data."
     view = df.copy()
-    # Begrens kolonnebredder litt:
     view["ticker"] = view["ticker"].astype(str)
-    # Lag en lett tabell (uten index)
     txt = view.head(max_rows).to_string(index=False)
     return f"```\n{txt}\n```"
 
@@ -157,7 +151,6 @@ def send_discord_webhook(
     payload = {
         "username": username,
         **({"avatar_url": avatar_url} if avatar_url else {}),
-        # Hvis du kun vil ha embed uten content-tekst, kan 'content' utelates
         "content": None,
         "embeds": [embed],
     }
@@ -194,7 +187,6 @@ def send_webhook_auto(data: dict, df: pd.DataFrame, csv_path: Optional[str], url
         return
 
     if _is_discord(url):
-        # Plukk felter for embed
         title = "3-Day Return Scan (BUY/HOLD)"
         send_discord_webhook(
             url=url,
@@ -220,7 +212,6 @@ def run_scan(start: str, end: Optional[str]) -> None:
     print(f"Laster priser fra {start} til {end} (adjusted close)...")
     prices = download_adjusted_close(TICKERS, start=start, end=end)
 
-    # Begrens til >= start (yfinance kan gi litt tidligere pga. lookback)
     prices = prices.loc[prices.index >= pd.to_datetime(start)]
 
     if len(prices) < LOOKBACK_DAYS + 1:
@@ -237,7 +228,6 @@ def run_scan(start: str, end: Optional[str]) -> None:
         send_webhook_auto(payload, pd.DataFrame(), None, DISCORD_WEBHOOK_URL)
         return
 
-    # Beregn 3-dagers retur – uten implisitt fyll (unngå FutureWarning)
     returns_3d = prices.pct_change(LOOKBACK_DAYS, fill_method=None)
 
     last_date = prices.index[-1]
@@ -262,7 +252,6 @@ def run_scan(start: str, end: Optional[str]) -> None:
         })
 
     df = pd.DataFrame(rows)
-    # Sortér: mest negativ retur øverst, HOLD/BUY håndteres av terskel
     if not df.empty:
         df = df.sort_values(by=["ret_3d_%"], ascending=True)
 
@@ -272,16 +261,13 @@ def run_scan(start: str, end: Optional[str]) -> None:
     else:
         print(df.to_string(index=False))
 
-    # Lagre CSV
     csv_path = "scan_3day.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nLagret til {csv_path}")
 
-    # Varsle om tickere uten data i siste rad
     if missing:
         print("\nAdvarsel: Mangler pris på siste dato for:", ", ".join(missing))
 
-    # --- Webhook payload (felles for Discord/generic) ---
     summary_text = (
         f"3-day scan as of {last_date.date().isoformat()} | "
         f"LOOKBACK={LOOKBACK_DAYS} | THRESH={DROP_THRESHOLD:.4f} | "
